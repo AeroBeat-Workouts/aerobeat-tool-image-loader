@@ -31,7 +31,7 @@ text = "AeroBeat Image Loader Testbed"
 [node name="Description" type="Label" parent="Split/Sidebar"]
 layout_mode = 2
 autowrap_mode = 3
-text = "Proof scene for the public AeroImageLoader singleton. Pick a slot, choose maintain-aspect or stretch, and load local .png without talking to the raw vendor package directly."
+text = "Proof scene for the public AeroImageLoader singleton. Pick a slot, choose maintain-aspect or stretch, and load truthful .png from local paths or remote http/https URLs without talking to the raw vendor package directly."
 
 [node name="PickFileButton" type="Button" parent="Split/Sidebar"]
 layout_mode = 2
@@ -48,6 +48,10 @@ text = "Load sample from user://"
 [node name="SampleAbsoluteButton" type="Button" parent="Split/Sidebar"]
 layout_mode = 2
 text = "Load sample from absolute path"
+
+[node name="SampleRemoteButton" type="Button" parent="Split/Sidebar"]
+layout_mode = 2
+text = "Load sample from http:// fixture"
 
 [node name="SlotLabel" type="Label" parent="Split/Sidebar"]
 layout_mode = 2
@@ -136,7 +140,7 @@ stretch_mode = 6
 layout_mode = 2
 size_flags_horizontal = 3
 autowrap_mode = 3
-text = "Load the same landscape sample into the square card slot to see the public maintain-aspect vs stretch toggle do visibly different placement work."
+text = "Load the same landscape sample into the square card slot to see the public maintain-aspect vs stretch toggle do visibly different placement work, then flip to the http:// fixture button to prove the wrapper stays vendor-agnostic while remote fetching happens below it."
 
 [node name="FileDialog" type="FileDialog" parent="."]
 unique_name_in_owner = true
@@ -149,6 +153,7 @@ filters = PackedStringArray("*.png ; PNG image")
 [connection signal="pressed" from="Split/Sidebar/SampleResButton" to="." method="_on_load_sample_res_pressed"]
 [connection signal="pressed" from="Split/Sidebar/SampleUserButton" to="." method="_on_load_sample_user_pressed"]
 [connection signal="pressed" from="Split/Sidebar/SampleAbsoluteButton" to="." method="_on_load_sample_absolute_pressed"]
+[connection signal="pressed" from="Split/Sidebar/SampleRemoteButton" to="." method="_on_load_sample_remote_pressed"]
 [connection signal="item_selected" from="Split/Sidebar/SlotSelector" to="." method="_on_slot_selector_item_selected"]
 [connection signal="toggled" from="Split/Sidebar/MaintainAspectCheck" to="." method="_on_maintain_aspect_check_toggled"]
 [connection signal="file_selected" from="FileDialog" to="." method="_on_file_dialog_file_selected"]

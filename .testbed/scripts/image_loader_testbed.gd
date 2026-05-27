@@ -2,6 +2,9 @@ extends Control
 
 const SAMPLE_RES_PATH := "res://addons/aerobeat-tool-image-loader/assets/images/demo_tool_landscape.png"
 const SAMPLE_EXTERNAL_DIR_NAME := "aerobeat-tool-image-loader-testbed"
+const SAMPLE_ASSET_DIR := "res://addons/aerobeat-tool-image-loader/assets/images"
+const SAMPLE_FILE_NAME := "demo_tool_landscape.png"
+const RemoteSampleServerScript := preload("res://scripts/remote_sample_server.gd")
 
 @onready var slot_selector: OptionButton = %SlotSelector
 @onready var maintain_aspect_check: CheckBox = %MaintainAspectCheck
@@ -12,8 +15,10 @@ const SAMPLE_EXTERNAL_DIR_NAME := "aerobeat-tool-image-loader-testbed"
 @onready var card_surface: TextureRect = %CardSurface
 @onready var file_dialog: FileDialog = %FileDialog
 
+var _remote_server
 var _user_sample_path: String = ""
 var _external_sample_path: String = ""
+var _remote_sample_url: String = ""
 
 func _ready() -> void:
 	AeroImageLoader.reset()
@@ -25,9 +30,13 @@ func _ready() -> void:
 	_configure_slot_selector()
 	_prepare_runtime_samples()
 	path_label.text = SAMPLE_RES_PATH
-	status_label.text = "Ready to place .png into the background or card slot."
-	detail_label.text = "Public contract: slot + maintain_aspect_ratio. Backend fit modes stay hidden."
+	status_label.text = "Ready to place .png into the background or card slot from local paths or remote http/https URLs."
+	detail_label.text = "Public contract: slot + maintain_aspect_ratio. Backend fetch/decode details stay hidden."
 	_load_path(SAMPLE_RES_PATH)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _remote_server != null:
+		_remote_server.stop()
 
 func _configure_slot_selector() -> void:
 	slot_selector.clear()
@@ -44,6 +53,12 @@ func _prepare_runtime_samples() -> void:
 		DirAccess.make_dir_recursive_absolute(external_dir)
 		_external_sample_path = external_dir.path_join("demo_tool_landscape.png")
 		_copy_file(source_path, _external_sample_path)
+	_remote_server = RemoteSampleServerScript.new()
+	var remote_server_result: Dictionary = _remote_server.start(SAMPLE_ASSET_DIR, SAMPLE_FILE_NAME)
+	if bool(remote_server_result.get("success", false)):
+		_remote_sample_url = str(remote_server_result.get("detail", {}).get("url", ""))
+	else:
+		status_label.text = "Remote sample server unavailable; local-path proving still works."
 
 func _selected_slot() -> String:
 	return slot_selector.get_item_text(slot_selector.selected)
@@ -73,6 +88,12 @@ func _on_load_sample_absolute_pressed() -> void:
 	if not _external_sample_path.is_empty():
 		_load_path(_external_sample_path)
 
+func _on_load_sample_remote_pressed() -> void:
+	if _remote_sample_url.is_empty():
+		status_label.text = "Remote sample URL unavailable."
+		return
+	_load_path(_remote_sample_url)
+
 func _on_slot_selector_item_selected(_index: int) -> void:
 	var slot_name := _selected_slot()
 	var descriptor := AeroImageLoader.get_slot_descriptor(slot_name)
@@ -91,10 +112,11 @@ func _on_state_changed(_state: String, _detail: Dictionary) -> void:
 
 func _on_image_loaded(result: Dictionary) -> void:
 	var detail: Dictionary = result.get("detail", {})
-	status_label.text = "Loaded %s into %s (maintain_aspect_ratio=%s)." % [
+	status_label.text = "Loaded %s into %s (maintain_aspect_ratio=%s, kind=%s)." % [
 		str(detail.get("path", "")),
 		str(detail.get("slot", "")),
 		str(detail.get("maintain_aspect_ratio", true)),
+		str(detail.get("path_kind", "unknown")),
 	]
 	_refresh_detail_label(AeroImageLoader.get_state())
 

@@ -62,6 +62,15 @@ func load_image(source: Dictionary, on_success: Callable = Callable(), on_failur
 		Callable(self, "_on_vendor_load_failure").bind(on_failure)
 	)
 	if bool(vendor_result.get("success", false)):
+		if bool(vendor_result.get("detail", {}).get("pending", false)):
+			return _ok({
+				"path": normalized.get("path", ""),
+				"slot": _active_slot,
+				"maintain_aspect_ratio": bool(normalized.get("maintain_aspect_ratio", true)),
+				"pending": true,
+				"path_kind": vendor_result.get("detail", {}).get("path_kind", ""),
+				"backend_result": vendor_result.duplicate(true),
+			})
 		return _last_result.duplicate(true)
 	return _last_error.duplicate(true)
 
@@ -183,6 +192,7 @@ func get_capabilities() -> Dictionary:
 		"backend_ready": _vendor_loader != null,
 		"supports_slots": true,
 		"supports_maintain_aspect_ratio": true,
+		"supports_remote_urls": bool(vendor_capabilities.get("supports_remote_urls", false)),
 		"supported_extensions": Array(vendor_capabilities.get("supported_extensions", ["png"])).duplicate(true),
 		"supported_path_kinds": Array(vendor_capabilities.get("supported_path_kinds", [])).duplicate(true),
 	}
@@ -194,6 +204,8 @@ func reset() -> void:
 	_last_result = {}
 	_last_error = {}
 	_state = STATE_IDLE
+	if _vendor_loader != null and is_instance_valid(_vendor_loader) and _vendor_loader.has_method("reset"):
+		_vendor_loader.call("reset")
 	for slot_name in _slot_surfaces.keys():
 		var slot_info: Dictionary = _slot_surfaces.get(slot_name, {})
 		var surface: TextureRect = slot_info.get("surface", null)
