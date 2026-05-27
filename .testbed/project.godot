@@ -2,8 +2,13 @@ config_version=5
 
 [application]
 
-config/name="AeroBeat Tool Testbed"
+config/name="AeroBeat Image Loader Testbed"
 config/features=PackedStringArray("4.6", "Forward Plus")
+run/main_scene="res://scenes/image_loader_testbed.tscn"
+
+[autoload]
+
+AeroImageLoader="*res://addons/aerobeat-tool-image-loader/src/AeroImageLoader.gd"
 
 [editor_plugins]
 

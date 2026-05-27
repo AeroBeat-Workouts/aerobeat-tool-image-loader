@@ -1,0 +1,154 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/image_loader_testbed.gd" id="1"]
+
+[node name="ImageLoaderTestbed" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Split" type="HSplitContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+split_offset = 320
+
+[node name="Sidebar" type="VBoxContainer" parent="Split"]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Split/Sidebar"]
+layout_mode = 2
+text = "AeroBeat Image Loader Testbed"
+
+[node name="Description" type="Label" parent="Split/Sidebar"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Proof scene for the public AeroImageLoader singleton. Pick a slot, choose maintain-aspect or stretch, and load local .png without talking to the raw vendor package directly."
+
+[node name="PickFileButton" type="Button" parent="Split/Sidebar"]
+layout_mode = 2
+text = "Pick .png from filesystem"
+
+[node name="SampleResButton" type="Button" parent="Split/Sidebar"]
+layout_mode = 2
+text = "Load sample from res://"
+
+[node name="SampleUserButton" type="Button" parent="Split/Sidebar"]
+layout_mode = 2
+text = "Load sample from user://"
+
+[node name="SampleAbsoluteButton" type="Button" parent="Split/Sidebar"]
+layout_mode = 2
+text = "Load sample from absolute path"
+
+[node name="SlotLabel" type="Label" parent="Split/Sidebar"]
+layout_mode = 2
+text = "Target slot"
+
+[node name="SlotSelector" type="OptionButton" parent="Split/Sidebar"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="MaintainAspectCheck" type="CheckBox" parent="Split/Sidebar"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Maintain aspect ratio"
+
+[node name="PathLabel" type="Label" parent="Split/Sidebar"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+text = "No image selected."
+
+[node name="StatusLabel" type="Label" parent="Split/Sidebar"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+text = "Idle."
+
+[node name="DetailLabel" type="Label" parent="Split/Sidebar"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+text = "No details yet."
+
+[node name="PreviewArea" type="VBoxContainer" parent="Split"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BackgroundLabel" type="Label" parent="Split/PreviewArea"]
+layout_mode = 2
+text = "background slot"
+
+[node name="BackgroundPanel" type="PanelContainer" parent="Split/PreviewArea"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BackgroundSurface" type="TextureRect" parent="Split/PreviewArea/BackgroundPanel"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="CardLabel" type="Label" parent="Split/PreviewArea"]
+layout_mode = 2
+text = "card slot"
+
+[node name="CardRow" type="HBoxContainer" parent="Split/PreviewArea"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CardPanel" type="PanelContainer" parent="Split/PreviewArea/CardRow"]
+custom_minimum_size = Vector2(260, 260)
+layout_mode = 2
+size_flags_horizontal = 1
+size_flags_vertical = 3
+
+[node name="CardSurface" type="TextureRect" parent="Split/PreviewArea/CardRow/CardPanel"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="CardHint" type="Label" parent="Split/PreviewArea/CardRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3
+text = "Load the same landscape sample into the square card slot to see the public maintain-aspect vs stretch toggle do visibly different placement work."
+
+[node name="FileDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+visible = false
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.png ; PNG image")
+
+[connection signal="pressed" from="Split/Sidebar/PickFileButton" to="." method="_on_pick_file_pressed"]
+[connection signal="pressed" from="Split/Sidebar/SampleResButton" to="." method="_on_load_sample_res_pressed"]
+[connection signal="pressed" from="Split/Sidebar/SampleUserButton" to="." method="_on_load_sample_user_pressed"]
+[connection signal="pressed" from="Split/Sidebar/SampleAbsoluteButton" to="." method="_on_load_sample_absolute_pressed"]
+[connection signal="item_selected" from="Split/Sidebar/SlotSelector" to="." method="_on_slot_selector_item_selected"]
+[connection signal="toggled" from="Split/Sidebar/MaintainAspectCheck" to="." method="_on_maintain_aspect_check_toggled"]
+[connection signal="file_selected" from="FileDialog" to="." method="_on_file_dialog_file_selected"]

@@ -1,22 +1,60 @@
-# AeroBeat Tool Template
+# AeroBeat Image Loader
 
-This is the official template for creating **Tool** repositories within the current AeroBeat v1 architecture.
+This repo now hosts the first **vendor-agnostic image-loading singleton** for the AeroBeat tool lane.
 
-It should be read against the locked product direction from `aerobeat-docs`:
+`AeroImageLoader` stays consumer-facing and backend-neutral: callers talk in terms of image paths, slot names, and whether a slot should maintain aspect ratio or stretch. The current truthful implementation resolves the landed `aerobeat-vendor-godot-image` backend at runtime and uses it as the thin PNG-loading/runtime surface.
 
-- **Primary release target:** PC community first
-- **Official v1 gameplay features:** Boxing and Flow
-- **Official v1 gameplay input:** camera only
-- **Tool stance:** tools should stay workflow-oriented and gameplay-mode agnostic enough to support the current product slice without implying equal-status future gameplay/input/platform scope
-- **Tool lane ownership:** shared tool-side DTOs, progress/result models, and workflow interfaces belong in `aerobeat-tool-core`; concrete authoring/import/export/validation tooling belongs in specific `aerobeat-tool-*` repos
+## Current contract scope
 
-## 📋 Repository Details
+- `src/AeroImageLoader.gd`
+  - singleton/autoload-friendly public image-loading service
+  - vendor-factory resolution at runtime through the installed `AeroGodotImageVendorFactory` global class
+  - slot-aware surface attachment via `attach_slot_surface(slot_name, texture_rect, maintain_aspect_ratio := true)`
+  - vendor-agnostic load requests via `load_image({...})` or `load_path(...)`
+  - maintain-aspect (`cover`) vs stretch mapping owned here rather than exposed to consumers as vendor fit-mode vocabulary
+- `assets/images/demo_tool_landscape.png`
+  - checked-in PNG sample used by the hidden proving surface and automated tests
+- hidden `.testbed/`
+  - autoload wiring for `AeroImageLoader`
+  - file-picker/manual proving scene that exercises slot placement + maintain-aspect/stretch through the public singleton only
+  - repo-local GUT tests covering the wrapper contract against the real vendor backend
 
-- **Type:** Tool template
-- **License:** **Mozilla Public License 2.0 (MPL 2.0)**
-- **Dependency contract:**
-  - `aerobeat-tool-core` — required shared tool/workflow contract
-  - additional adjacent lane/core repos only when the specific tool actually consumes them (commonly `aerobeat-content-core` or `aerobeat-asset-core`)
+## Public surface
+
+Example:
+
+```gdscript
+AeroImageLoader.attach_slot_surface("background", $BackgroundTextureRect, true)
+
+var result := AeroImageLoader.load_image({
+	"path": "res://addons/aerobeat-tool-image-loader/assets/images/demo_tool_landscape.png",
+	"slot": "background",
+	"maintain_aspect_ratio": true,
+	"metadata": {"usage": "environment_background"},
+})
+
+if not result.get("success", false):
+	push_error(result.get("message", "Image load failed"))
+```
+
+The public wrapper intentionally keeps vendor fit-mode terms out of the normal call site. Consumers choose:
+
+- which **slot** should receive the image
+- whether the slot should **maintain aspect ratio** or **stretch**
+- a concrete local path (`res://`, `user://`, project-relative, or absolute device path)
+
+## Hidden `.testbed/` proving surface
+
+The repo includes a hidden proving scene at:
+
+- `.testbed/scenes/image_loader_testbed.tscn`
+
+It provides:
+
+- filesystem file picker flow for local `.png`
+- one-click proof buttons for packaged `res://`, `user://`, and absolute-path loading
+- two attached preview slots (`background` and `card`) driven through `AeroImageLoader`
+- maintain-aspect vs stretch toggling through the public singleton
 
 ## GodotEnv development flow
 
@@ -39,8 +77,6 @@ cd .testbed
 godotenv addons install
 ```
 
-That restores this repo's current dev/test manifest into `.testbed/addons/`. Canonically, Tool templates should keep the baseline manifest narrow: `aerobeat-tool-core` plus test-only tooling.
-
 ### Open the workbench
 
 From the repo root:
@@ -49,7 +85,7 @@ From the repo root:
 godot --editor --path .testbed
 ```
 
-Use this `.testbed/` project as the canonical direct-development and bugfinding surface for tool-template work.
+Use this `.testbed/` project as the canonical direct-development and bugfinding surface for image-loader work.
 
 ### Import smoke check
 
@@ -69,12 +105,3 @@ godot --headless --path .testbed --script addons/gut/gut_cmdln.gd \
   -ginclude_subdirs \
   -gexit
 ```
-
-### Validation notes
-
-- `.testbed/addons.jsonc` is the committed dev/test dependency contract.
-- The canonical template manifest for this repo is `aerobeat-tool-core` + `gut`.
-- `aerobeat-tool-core` is currently pinned to `main` intentionally because the repo does not yet have release tags; switch to a tag once tagged releases exist.
-- If a concrete tool needs adjacent lane repos, add them intentionally rather than restoring a universal `aerobeat-core` baseline.
-- Repo-local unit tests live under `.testbed/tests/` and currently validate repo metadata plus the template stub contract.
-- The current package shape is consumed from the repo root (`subfolder: "/"`) for downstream installs.

@@ -1,0 +1,124 @@
+extends Control
+
+const SAMPLE_RES_PATH := "res://addons/aerobeat-tool-image-loader/assets/images/demo_tool_landscape.png"
+const SAMPLE_EXTERNAL_DIR_NAME := "aerobeat-tool-image-loader-testbed"
+
+@onready var slot_selector: OptionButton = %SlotSelector
+@onready var maintain_aspect_check: CheckBox = %MaintainAspectCheck
+@onready var path_label: Label = %PathLabel
+@onready var status_label: Label = %StatusLabel
+@onready var detail_label: Label = %DetailLabel
+@onready var background_surface: TextureRect = %BackgroundSurface
+@onready var card_surface: TextureRect = %CardSurface
+@onready var file_dialog: FileDialog = %FileDialog
+
+var _user_sample_path: String = ""
+var _external_sample_path: String = ""
+
+func _ready() -> void:
+	AeroImageLoader.reset()
+	AeroImageLoader.attach_slot_surface("background", background_surface, true)
+	AeroImageLoader.attach_slot_surface("card", card_surface, true)
+	AeroImageLoader.state_changed.connect(_on_state_changed)
+	AeroImageLoader.image_loaded.connect(_on_image_loaded)
+	AeroImageLoader.image_failed.connect(_on_image_failed)
+	_configure_slot_selector()
+	_prepare_runtime_samples()
+	path_label.text = SAMPLE_RES_PATH
+	status_label.text = "Ready to place .png into the background or card slot."
+	detail_label.text = "Public contract: slot + maintain_aspect_ratio. Backend fit modes stay hidden."
+	_load_path(SAMPLE_RES_PATH)
+
+func _configure_slot_selector() -> void:
+	slot_selector.clear()
+	slot_selector.add_item("background")
+	slot_selector.add_item("card")
+	slot_selector.select(0)
+
+func _prepare_runtime_samples() -> void:
+	var source_path := ProjectSettings.globalize_path(SAMPLE_RES_PATH)
+	_user_sample_path = ProjectSettings.globalize_path("user://demo_tool_landscape.png")
+	if FileAccess.file_exists(source_path):
+		_copy_file(source_path, _user_sample_path)
+		var external_dir := OS.get_cache_dir().path_join(SAMPLE_EXTERNAL_DIR_NAME)
+		DirAccess.make_dir_recursive_absolute(external_dir)
+		_external_sample_path = external_dir.path_join("demo_tool_landscape.png")
+		_copy_file(source_path, _external_sample_path)
+
+func _selected_slot() -> String:
+	return slot_selector.get_item_text(slot_selector.selected)
+
+func _load_path(path: String) -> void:
+	path_label.text = path
+	var slot_name := _selected_slot()
+	var maintain_aspect_ratio := maintain_aspect_check.button_pressed
+	AeroImageLoader.set_active_slot(slot_name)
+	AeroImageLoader.set_slot_maintain_aspect_ratio(slot_name, maintain_aspect_ratio)
+	AeroImageLoader.load_image({
+		"path": path,
+		"slot": slot_name,
+		"maintain_aspect_ratio": maintain_aspect_ratio,
+	})
+
+func _on_pick_file_pressed() -> void:
+	file_dialog.popup_centered_ratio(0.8)
+
+func _on_load_sample_res_pressed() -> void:
+	_load_path(SAMPLE_RES_PATH)
+
+func _on_load_sample_user_pressed() -> void:
+	_load_path("user://demo_tool_landscape.png")
+
+func _on_load_sample_absolute_pressed() -> void:
+	if not _external_sample_path.is_empty():
+		_load_path(_external_sample_path)
+
+func _on_slot_selector_item_selected(_index: int) -> void:
+	var slot_name := _selected_slot()
+	var descriptor := AeroImageLoader.get_slot_descriptor(slot_name)
+	maintain_aspect_check.button_pressed = bool(descriptor.get("maintain_aspect_ratio", true))
+	_refresh_detail_label(AeroImageLoader.get_state())
+
+func _on_maintain_aspect_check_toggled(pressed: bool) -> void:
+	AeroImageLoader.set_slot_maintain_aspect_ratio(_selected_slot(), pressed)
+	_refresh_detail_label(AeroImageLoader.get_state())
+
+func _on_file_dialog_file_selected(path: String) -> void:
+	_load_path(path)
+
+func _on_state_changed(_state: String, _detail: Dictionary) -> void:
+	_refresh_detail_label(AeroImageLoader.get_state())
+
+func _on_image_loaded(result: Dictionary) -> void:
+	var detail: Dictionary = result.get("detail", {})
+	status_label.text = "Loaded %s into %s (maintain_aspect_ratio=%s)." % [
+		str(detail.get("path", "")),
+		str(detail.get("slot", "")),
+		str(detail.get("maintain_aspect_ratio", true)),
+	]
+	_refresh_detail_label(AeroImageLoader.get_state())
+
+func _on_image_failed(error_info: Dictionary) -> void:
+	status_label.text = "Load failed: %s" % str(error_info.get("message", "Unknown error"))
+	_refresh_detail_label(AeroImageLoader.get_state())
+
+func _refresh_detail_label(state_snapshot: Dictionary) -> void:
+	var detail: Dictionary = state_snapshot.get("detail", {})
+	detail_label.text = "State: %s | Slot: %s | maintain_aspect_ratio: %s | Size: %sx%s | Surface attached: %s" % [
+		str(state_snapshot.get("state", AeroImageLoader.STATE_IDLE)),
+		str(detail.get("active_slot", "")),
+		str(detail.get("maintain_aspect_ratio", true)),
+		str(detail.get("width", 0)),
+		str(detail.get("height", 0)),
+		str(detail.get("surface_attached", false)),
+	]
+
+func _copy_file(source_path: String, destination_path: String) -> bool:
+	var source_file := FileAccess.open(source_path, FileAccess.READ)
+	if source_file == null:
+		return false
+	var destination_file := FileAccess.open(destination_path, FileAccess.WRITE)
+	if destination_file == null:
+		return false
+	destination_file.store_buffer(source_file.get_buffer(source_file.get_length()))
+	return true
