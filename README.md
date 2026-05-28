@@ -12,7 +12,7 @@ This repo now hosts the first **vendor-agnostic image-loading singleton** for th
   - slot-aware surface attachment via `attach_slot_surface(slot_name, texture_rect, maintain_aspect_ratio := true)`
   - vendor-agnostic load requests via `load_image({...})` or `load_path(...)`
   - maintain-aspect (`cover`) vs stretch mapping owned here rather than exposed to consumers as vendor fit-mode vocabulary
-- `assets/images/demo_tool_landscape.png`
+- `.testbed/assets/images/demo_tool_landscape.png`
   - checked-in PNG sample used by the hidden proving surface and automated tests
 - hidden `.testbed/`
   - autoload wiring for `AeroImageLoader`
@@ -27,7 +27,7 @@ Example:
 AeroImageLoader.attach_slot_surface("background", $BackgroundTextureRect, true)
 
 var result := AeroImageLoader.load_image({
-	"path": "res://addons/aerobeat-tool-image-loader/assets/images/demo_tool_landscape.png",
+	"path": "res://assets/images/demo_tool_landscape.png",
 	"slot": "background",
 	"maintain_aspect_ratio": true,
 	"metadata": {"usage": "environment_background"},

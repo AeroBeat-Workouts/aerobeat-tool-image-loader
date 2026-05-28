@@ -2,8 +2,8 @@ extends GutTest
 
 const LoaderScript := preload("res://addons/aerobeat-tool-image-loader/src/AeroImageLoader.gd")
 const RemoteSampleServerScript := preload("res://scripts/remote_sample_server.gd")
-const SAMPLE_RES_PATH := "res://addons/aerobeat-tool-image-loader/assets/images/demo_tool_landscape.png"
-const SAMPLE_ASSET_DIR := "res://addons/aerobeat-tool-image-loader/assets/images"
+const SAMPLE_RES_PATH := "res://assets/images/demo_tool_landscape.png"
+const SAMPLE_ASSET_DIR := "res://assets/images"
 const SAMPLE_FILE_NAME := "demo_tool_landscape.png"
 
 var _loader: Node
@@ -138,7 +138,7 @@ func test_loader_emits_callbacks_and_normalized_failures_for_local_and_remote_so
 	assert_signal_emitted(_loader, "image_loaded")
 
 	watch_signals(_loader)
-	var failure_result: Dictionary = _loader.load_image({"path": "res://addons/aerobeat-tool-image-loader/assets/images/missing.png", "slot": "background"}, Callable(self, "_on_success"), Callable(self, "_on_failure"))
+	var failure_result: Dictionary = _loader.load_image({"path": "res://assets/images/missing.png", "slot": "background"}, Callable(self, "_on_success"), Callable(self, "_on_failure"))
 	assert_false(bool(failure_result.get("success", true)), "Missing PNG should fail honestly")
 	assert_eq(_failure_results.size(), 1, "Failure callback should run once")
 	assert_signal_emitted(_loader, "image_failed")

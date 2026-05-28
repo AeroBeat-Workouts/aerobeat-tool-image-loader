@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b5gv5vl8bpnud"
-path="res://.godot/imported/demo_tool_landscape.png-40c7097fc98e8a0990ac09b73a4157a0.ctex"
+path="res://.godot/imported/demo_tool_landscape.png-d9230d6808ecc8bf230cd22d342bcfd9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/aerobeat-tool-image-loader/assets/images/demo_tool_landscape.png"
-dest_files=["res://.godot/imported/demo_tool_landscape.png-40c7097fc98e8a0990ac09b73a4157a0.ctex"]
+source_file="res://assets/images/demo_tool_landscape.png"
+dest_files=["res://.godot/imported/demo_tool_landscape.png-d9230d6808ecc8bf230cd22d342bcfd9.ctex"]
 
 [params]
 

@@ -1,8 +1,8 @@
 extends Control
 
-const SAMPLE_RES_PATH := "res://addons/aerobeat-tool-image-loader/assets/images/demo_tool_landscape.png"
+const SAMPLE_RES_PATH := "res://assets/images/demo_tool_landscape.png"
 const SAMPLE_EXTERNAL_DIR_NAME := "aerobeat-tool-image-loader-testbed"
-const SAMPLE_ASSET_DIR := "res://addons/aerobeat-tool-image-loader/assets/images"
+const SAMPLE_ASSET_DIR := "res://assets/images"
 const SAMPLE_FILE_NAME := "demo_tool_landscape.png"
 const RemoteSampleServerScript := preload("res://scripts/remote_sample_server.gd")
 
