@@ -7,7 +7,7 @@ const SAMPLE_FILE_NAME := "demo_tool_landscape.png"
 const RemoteSampleServerScript := preload("res://scripts/remote_sample_server.gd")
 
 @onready var slot_selector: OptionButton = %SlotSelector
-@onready var maintain_aspect_check: CheckBox = %MaintainAspectCheck
+@onready var fit_mode_selector: OptionButton = %FitModeSelector
 @onready var path_label: Label = %PathLabel
 @onready var status_label: Label = %StatusLabel
 @onready var detail_label: Label = %DetailLabel
@@ -23,15 +23,16 @@ var _remote_sample_url: String = ""
 func _ready() -> void:
 	AeroImageLoader.reset()
 	AeroImageLoader.attach_slot_surface("background", background_surface, true)
-	AeroImageLoader.attach_slot_surface("card", card_surface, true)
+	AeroImageLoader.attach_slot_surface("card", card_surface, false)
 	AeroImageLoader.state_changed.connect(_on_state_changed)
 	AeroImageLoader.image_loaded.connect(_on_image_loaded)
 	AeroImageLoader.image_failed.connect(_on_image_failed)
 	_configure_slot_selector()
+	_configure_fit_mode_selector()
 	_prepare_runtime_samples()
 	path_label.text = SAMPLE_RES_PATH
 	status_label.text = "Ready to place .png into the background or card slot from local paths or remote http/https URLs."
-	detail_label.text = "Public contract: slot + maintain_aspect_ratio. Backend fetch/decode details stay hidden."
+	detail_label.text = "Public contract: slot + fit-mode selection. Backend fetch/decode details stay hidden."
 	_load_path(SAMPLE_RES_PATH)
 
 func _notification(what: int) -> void:
@@ -43,6 +44,12 @@ func _configure_slot_selector() -> void:
 	slot_selector.add_item("background")
 	slot_selector.add_item("card")
 	slot_selector.select(0)
+
+func _configure_fit_mode_selector() -> void:
+	fit_mode_selector.clear()
+	fit_mode_selector.add_item("maintain_aspect_ratio")
+	fit_mode_selector.add_item("stretch")
+	fit_mode_selector.select(0)
 
 func _prepare_runtime_samples() -> void:
 	var source_path := ProjectSettings.globalize_path(SAMPLE_RES_PATH)
@@ -66,7 +73,7 @@ func _selected_slot() -> String:
 func _load_path(path: String) -> void:
 	path_label.text = path
 	var slot_name := _selected_slot()
-	var maintain_aspect_ratio := maintain_aspect_check.button_pressed
+	var maintain_aspect_ratio := _selected_fit_mode() == "maintain_aspect_ratio"
 	AeroImageLoader.set_active_slot(slot_name)
 	AeroImageLoader.set_slot_maintain_aspect_ratio(slot_name, maintain_aspect_ratio)
 	AeroImageLoader.load_image({
@@ -97,11 +104,11 @@ func _on_load_sample_remote_pressed() -> void:
 func _on_slot_selector_item_selected(_index: int) -> void:
 	var slot_name := _selected_slot()
 	var descriptor := AeroImageLoader.get_slot_descriptor(slot_name)
-	maintain_aspect_check.button_pressed = bool(descriptor.get("maintain_aspect_ratio", true))
+	fit_mode_selector.select(0 if bool(descriptor.get("maintain_aspect_ratio", true)) else 1)
 	_refresh_detail_label(AeroImageLoader.get_state())
 
-func _on_maintain_aspect_check_toggled(pressed: bool) -> void:
-	AeroImageLoader.set_slot_maintain_aspect_ratio(_selected_slot(), pressed)
+func _on_fit_mode_selector_item_selected(_index: int) -> void:
+	AeroImageLoader.set_slot_maintain_aspect_ratio(_selected_slot(), _selected_fit_mode() == "maintain_aspect_ratio")
 	_refresh_detail_label(AeroImageLoader.get_state())
 
 func _on_file_dialog_file_selected(path: String) -> void:
@@ -134,6 +141,9 @@ func _refresh_detail_label(state_snapshot: Dictionary) -> void:
 		str(detail.get("height", 0)),
 		str(detail.get("surface_attached", false)),
 	]
+
+func _selected_fit_mode() -> String:
+	return fit_mode_selector.get_item_text(fit_mode_selector.selected)
 
 func _copy_file(source_path: String, destination_path: String) -> bool:
 	var source_file := FileAccess.open(source_path, FileAccess.READ)

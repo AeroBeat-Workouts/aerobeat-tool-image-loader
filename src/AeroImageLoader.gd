@@ -6,7 +6,7 @@ signal image_loaded(result: Dictionary)
 signal image_failed(error_info: Dictionary)
 signal slot_surface_changed(slot_name: String, descriptor: Dictionary)
 
-const VERSION := "0.1.0"
+const VERSION := "0.2.0"
 const DEFAULT_SLOT := "primary"
 const DEFAULT_VENDOR_FACTORY_CLASS := "AeroGodotImageVendorFactory"
 const DEFAULT_VENDOR_BACKEND_ID := "godot_image"
@@ -94,6 +94,7 @@ func attach_slot_surface(slot_name: String, surface: TextureRect, maintain_aspec
 	_slot_surfaces[normalized_slot] = {
 		"surface": surface,
 		"maintain_aspect_ratio": maintain_aspect_ratio,
+		"fit_mode": _fit_mode_for_surface(maintain_aspect_ratio),
 	}
 	if _loaded_texture != null and normalized_slot == _active_slot:
 		_apply_loaded_texture_to_slot(normalized_slot)
@@ -134,6 +135,7 @@ func set_slot_maintain_aspect_ratio(slot_name: String, maintain_aspect_ratio: bo
 		)
 	var slot_info: Dictionary = _slot_surfaces.get(normalized_slot, {}).duplicate(true)
 	slot_info["maintain_aspect_ratio"] = maintain_aspect_ratio
+	slot_info["fit_mode"] = _fit_mode_for_surface(maintain_aspect_ratio)
 	_slot_surfaces[normalized_slot] = slot_info
 	if _loaded_texture != null and normalized_slot == _active_slot:
 		_apply_loaded_texture_to_slot(normalized_slot)
@@ -179,6 +181,7 @@ func get_slot_descriptor(slot_name: String) -> Dictionary:
 		"slot": normalized_slot,
 		"attached": surface != null and is_instance_valid(surface),
 		"maintain_aspect_ratio": bool(slot_info.get("maintain_aspect_ratio", true)),
+		"fit_mode": str(slot_info.get("fit_mode", _fit_mode_for_surface(bool(slot_info.get("maintain_aspect_ratio", true))))),
 		"has_texture": surface != null and is_instance_valid(surface) and surface.texture != null,
 	}
 
@@ -257,7 +260,10 @@ func _load_global_class_script(target_class_name: String) -> GDScript:
 	return null
 
 func _fit_mode_for_source(source: Dictionary) -> String:
-	return "cover" if bool(source.get("maintain_aspect_ratio", true)) else "stretch"
+	return _fit_mode_for_surface(bool(source.get("maintain_aspect_ratio", true)))
+
+func _fit_mode_for_surface(maintain_aspect_ratio: bool) -> String:
+	return "cover" if maintain_aspect_ratio else "stretch"
 
 func _build_vendor_metadata(source: Dictionary) -> Dictionary:
 	var metadata: Dictionary = source.get("metadata", {}).duplicate(true)
@@ -275,7 +281,7 @@ func _apply_loaded_texture_to_slot(slot_name: String) -> void:
 	var surface: TextureRect = slot_info.get("surface", null)
 	if surface == null or not is_instance_valid(surface):
 		return
-	var fit_mode := "cover" if bool(slot_info.get("maintain_aspect_ratio", true)) else "stretch"
+	var fit_mode := str(slot_info.get("fit_mode", _fit_mode_for_surface(bool(slot_info.get("maintain_aspect_ratio", true)))))
 	if _vendor_loader.has_method("apply_result_to_surface"):
 		_vendor_loader.call("apply_result_to_surface", surface, _loaded_texture, fit_mode)
 	else:

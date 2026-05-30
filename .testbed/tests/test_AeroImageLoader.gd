@@ -66,9 +66,10 @@ func test_public_surface_is_vendor_agnostic_and_slot_focused() -> void:
 	var class_names := _global_class_names()
 	assert_false(class_names.has("AeroToolManager"), "Repo should no longer export the template AeroToolManager global class")
 	assert_eq(str(ProjectSettings.get_setting("autoload/AeroImageLoader", "")), "*res://addons/aerobeat-tool-image-loader/src/AeroImageLoader.gd", "Testbed should expose the public singleton through autoload")
-	assert_eq(LoaderScript.VERSION, "0.1.0", "Wrapper version should reflect the landed public image-loader slice")
+	assert_eq(LoaderScript.VERSION, "0.2.0", "Wrapper version should reflect the landed public image-loader slice")
 	assert_true(bool(_loader.get_capabilities().get("supports_slots", false)), "Capabilities should advertise slot support")
 	assert_true(bool(_loader.get_capabilities().get("supports_maintain_aspect_ratio", false)), "Capabilities should advertise maintain-aspect support")
+	assert_eq(str(_loader.get_slot_descriptor("background").get("fit_mode", "")), "cover", "Slot descriptor should surface the abstraction-level fit mode")
 	assert_true(bool(_loader.get_capabilities().get("supports_remote_urls", false)), "Capabilities should advertise remote URL support through the vendor backend")
 
 func test_loader_supports_res_user_absolute_and_remote_paths_through_the_public_wrapper() -> void:
@@ -105,6 +106,7 @@ func test_loader_places_textures_into_named_slots_and_maps_maintain_aspect_vs_st
 	var attach_card: Dictionary = _loader.attach_slot_surface("card", card_surface, false)
 	assert_true(bool(attach_background.get("success", false)), "Background slot surface should attach")
 	assert_true(bool(attach_card.get("success", false)), "Card slot surface should attach")
+	assert_eq(str(_loader.get_slot_descriptor("card").get("fit_mode", "")), "stretch", "Slot descriptor should record stretch mode when maintain-aspect is disabled")
 
 	var background_result: Dictionary = _loader.load_image({"path": SAMPLE_RES_PATH, "slot": "background", "maintain_aspect_ratio": true})
 	assert_true(bool(background_result.get("success", false)), "Background slot should load packaged PNG")
