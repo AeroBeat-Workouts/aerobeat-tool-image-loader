@@ -6,10 +6,15 @@ signal image_loaded(result: Dictionary)
 signal image_failed(error_info: Dictionary)
 signal slot_surface_changed(slot_name: String, descriptor: Dictionary)
 
-const VERSION := "0.2.0"
+const VERSION := "0.3.0"
 const DEFAULT_SLOT := "primary"
 const DEFAULT_VENDOR_FACTORY_CLASS := "AeroGodotImageVendorFactory"
 const DEFAULT_VENDOR_BACKEND_ID := "godot_image"
+const FIT_MODE_STRETCH := "stretch"
+const FIT_MODE_CONTAIN := "contain"
+const FIT_MODE_COVER := "cover"
+const FIT_MODES := [FIT_MODE_STRETCH, FIT_MODE_CONTAIN, FIT_MODE_COVER]
+const DEFAULT_FIT_MODE := FIT_MODE_COVER
 
 const STATE_IDLE := "idle"
 const STATE_LOADING := "loading"
@@ -52,7 +57,7 @@ func load_image(source: Dictionary, on_success: Callable = Callable(), on_failur
 
 	var vendor_source := {
 		"path": normalized.get("path", ""),
-		"fit_mode": _fit_mode_for_source(normalized),
+		"fit_mode": str(normalized.get("fit_mode", DEFAULT_FIT_MODE)),
 		"metadata": _build_vendor_metadata(normalized),
 	}
 	var vendor_result: Dictionary = _vendor_loader.call(
@@ -63,10 +68,12 @@ func load_image(source: Dictionary, on_success: Callable = Callable(), on_failur
 	)
 	if bool(vendor_result.get("success", false)):
 		if bool(vendor_result.get("detail", {}).get("pending", false)):
+			var fit_mode := str(normalized.get("fit_mode", DEFAULT_FIT_MODE))
 			return _ok({
 				"path": normalized.get("path", ""),
 				"slot": _active_slot,
-				"maintain_aspect_ratio": bool(normalized.get("maintain_aspect_ratio", true)),
+				"fit_mode": fit_mode,
+				"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(fit_mode),
 				"pending": true,
 				"path_kind": vendor_result.get("detail", {}).get("path_kind", ""),
 				"backend_result": vendor_result.duplicate(true),
@@ -74,15 +81,15 @@ func load_image(source: Dictionary, on_success: Callable = Callable(), on_failur
 		return _last_result.duplicate(true)
 	return _last_error.duplicate(true)
 
-func load_path(path: String, slot_name: String = DEFAULT_SLOT, maintain_aspect_ratio: bool = true, metadata: Dictionary = {}) -> Dictionary:
+func load_path(path: String, slot_name: String = DEFAULT_SLOT, fit_mode: Variant = DEFAULT_FIT_MODE, metadata: Dictionary = {}) -> Dictionary:
 	return load_image({
 		"path": path,
 		"slot": slot_name,
-		"maintain_aspect_ratio": maintain_aspect_ratio,
+		"fit_mode": _normalize_fit_mode(fit_mode),
 		"metadata": metadata.duplicate(true),
 	})
 
-func attach_slot_surface(slot_name: String, surface: TextureRect, maintain_aspect_ratio: bool = true) -> Dictionary:
+func attach_slot_surface(slot_name: String, surface: TextureRect, fit_mode: Variant = DEFAULT_FIT_MODE) -> Dictionary:
 	var normalized_slot := _normalize_slot_name(slot_name)
 	if surface == null:
 		return _fail(
@@ -91,17 +98,22 @@ func attach_slot_surface(slot_name: String, surface: TextureRect, maintain_aspec
 			{"slot": normalized_slot},
 			Callable()
 		)
+	var normalized_fit_mode := _normalize_fit_mode(fit_mode)
 	_slot_surfaces[normalized_slot] = {
 		"surface": surface,
-		"maintain_aspect_ratio": maintain_aspect_ratio,
-		"fit_mode": _fit_mode_for_surface(maintain_aspect_ratio),
+		"fit_mode": normalized_fit_mode,
 	}
-	if _loaded_texture != null and normalized_slot == _active_slot:
+	if _loaded_texture != null:
 		_apply_loaded_texture_to_slot(normalized_slot)
 	var descriptor := get_slot_descriptor(normalized_slot)
 	slot_surface_changed.emit(normalized_slot, descriptor.duplicate(true))
 	_emit_state_changed(_compose_state_detail())
-	return _ok({"slot": normalized_slot, "attached": true, "maintain_aspect_ratio": maintain_aspect_ratio})
+	return _ok({
+		"slot": normalized_slot,
+		"attached": true,
+		"fit_mode": normalized_fit_mode,
+		"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(normalized_fit_mode),
+	})
 
 func detach_slot_surface(slot_name: String = "") -> Dictionary:
 	var normalized_slot := _normalize_slot_name(slot_name if not slot_name.is_empty() else _active_slot)
@@ -124,7 +136,7 @@ func set_active_slot(slot_name: String) -> Dictionary:
 	_emit_state_changed(_compose_state_detail())
 	return _ok({"slot": _active_slot})
 
-func set_slot_maintain_aspect_ratio(slot_name: String, maintain_aspect_ratio: bool) -> Dictionary:
+func set_slot_fit_mode(slot_name: String, fit_mode: Variant) -> Dictionary:
 	var normalized_slot := _normalize_slot_name(slot_name)
 	if not _slot_surfaces.has(normalized_slot):
 		return _fail(
@@ -134,22 +146,29 @@ func set_slot_maintain_aspect_ratio(slot_name: String, maintain_aspect_ratio: bo
 			Callable()
 		)
 	var slot_info: Dictionary = _slot_surfaces.get(normalized_slot, {}).duplicate(true)
-	slot_info["maintain_aspect_ratio"] = maintain_aspect_ratio
-	slot_info["fit_mode"] = _fit_mode_for_surface(maintain_aspect_ratio)
+	var normalized_fit_mode := _normalize_fit_mode(fit_mode)
+	slot_info["fit_mode"] = normalized_fit_mode
 	_slot_surfaces[normalized_slot] = slot_info
-	if _loaded_texture != null and normalized_slot == _active_slot:
+	if _loaded_texture != null:
 		_apply_loaded_texture_to_slot(normalized_slot)
 	var descriptor := get_slot_descriptor(normalized_slot)
 	slot_surface_changed.emit(normalized_slot, descriptor.duplicate(true))
 	_emit_state_changed(_compose_state_detail())
-	return _ok({"slot": normalized_slot, "maintain_aspect_ratio": maintain_aspect_ratio})
+	return _ok({
+		"slot": normalized_slot,
+		"fit_mode": normalized_fit_mode,
+		"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(normalized_fit_mode),
+	})
 
-func create_preview_surface(slot_name: String = DEFAULT_SLOT, maintain_aspect_ratio: bool = true) -> TextureRect:
+func set_slot_maintain_aspect_ratio(slot_name: String, maintain_aspect_ratio: bool) -> Dictionary:
+	return set_slot_fit_mode(slot_name, FIT_MODE_COVER if maintain_aspect_ratio else FIT_MODE_STRETCH)
+
+func create_preview_surface(slot_name: String = DEFAULT_SLOT, fit_mode: Variant = DEFAULT_FIT_MODE) -> TextureRect:
 	var texture_rect := TextureRect.new()
 	texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texture_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	attach_slot_surface(slot_name, texture_rect, maintain_aspect_ratio)
+	attach_slot_surface(slot_name, texture_rect, fit_mode)
 	return texture_rect
 
 func get_state() -> Dictionary:
@@ -177,11 +196,12 @@ func get_slot_descriptor(slot_name: String) -> Dictionary:
 	var normalized_slot := _normalize_slot_name(slot_name)
 	var slot_info: Dictionary = _slot_surfaces.get(normalized_slot, {})
 	var surface: TextureRect = slot_info.get("surface", null)
+	var fit_mode := str(slot_info.get("fit_mode", DEFAULT_FIT_MODE))
 	return {
 		"slot": normalized_slot,
 		"attached": surface != null and is_instance_valid(surface),
-		"maintain_aspect_ratio": bool(slot_info.get("maintain_aspect_ratio", true)),
-		"fit_mode": str(slot_info.get("fit_mode", _fit_mode_for_surface(bool(slot_info.get("maintain_aspect_ratio", true))))),
+		"fit_mode": fit_mode,
+		"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(fit_mode),
 		"has_texture": surface != null and is_instance_valid(surface) and surface.texture != null,
 	}
 
@@ -194,6 +214,8 @@ func get_capabilities() -> Dictionary:
 		"backend": DEFAULT_VENDOR_BACKEND_ID,
 		"backend_ready": _vendor_loader != null,
 		"supports_slots": true,
+		"supports_fit_mode": true,
+		"fit_modes": FIT_MODES.duplicate(),
 		"supports_maintain_aspect_ratio": true,
 		"supports_remote_urls": bool(vendor_capabilities.get("supports_remote_urls", false)),
 		"supported_extensions": Array(vendor_capabilities.get("supported_extensions", ["png"])).duplicate(true),
@@ -220,14 +242,18 @@ static func normalize_source(source: Dictionary) -> Dictionary:
 	var normalized := {
 		"path": "",
 		"slot": DEFAULT_SLOT,
-		"maintain_aspect_ratio": true,
+		"fit_mode": DEFAULT_FIT_MODE,
 		"metadata": {},
 	}
 	for key in source.keys():
 		normalized[key] = source[key]
 	normalized["path"] = str(normalized.get("path", "")).strip_edges()
 	normalized["slot"] = _normalize_slot_name(str(normalized.get("slot", DEFAULT_SLOT)))
-	normalized["maintain_aspect_ratio"] = bool(normalized.get("maintain_aspect_ratio", true))
+	var requested_fit_mode: Variant = source.get("fit_mode", null) if source.has("fit_mode") else null
+	if requested_fit_mode == null and source.has("maintain_aspect_ratio"):
+		requested_fit_mode = source.get("maintain_aspect_ratio", DEFAULT_FIT_MODE)
+	normalized["fit_mode"] = _normalize_fit_mode(requested_fit_mode if requested_fit_mode != null else normalized.get("fit_mode", DEFAULT_FIT_MODE))
+	normalized["maintain_aspect_ratio"] = _maintain_aspect_ratio_for_fit_mode(str(normalized.get("fit_mode", DEFAULT_FIT_MODE)))
 	if typeof(normalized.get("metadata", {})) != TYPE_DICTIONARY:
 		normalized["metadata"] = {}
 	return normalized
@@ -259,16 +285,21 @@ func _load_global_class_script(target_class_name: String) -> GDScript:
 			return load(path)
 	return null
 
-func _fit_mode_for_source(source: Dictionary) -> String:
-	return _fit_mode_for_surface(bool(source.get("maintain_aspect_ratio", true)))
+static func _normalize_fit_mode(value: Variant) -> String:
+	if typeof(value) == TYPE_BOOL:
+		return FIT_MODE_COVER if bool(value) else FIT_MODE_STRETCH
+	var normalized := str(value).strip_edges().to_lower()
+	return normalized if FIT_MODES.has(normalized) else DEFAULT_FIT_MODE
 
-func _fit_mode_for_surface(maintain_aspect_ratio: bool) -> String:
-	return "cover" if maintain_aspect_ratio else "stretch"
+static func _maintain_aspect_ratio_for_fit_mode(fit_mode: String) -> bool:
+	return fit_mode != FIT_MODE_STRETCH
 
 func _build_vendor_metadata(source: Dictionary) -> Dictionary:
 	var metadata: Dictionary = source.get("metadata", {}).duplicate(true)
+	var fit_mode := str(source.get("fit_mode", DEFAULT_FIT_MODE))
 	metadata["slot"] = source.get("slot", DEFAULT_SLOT)
-	metadata["maintain_aspect_ratio"] = bool(source.get("maintain_aspect_ratio", true))
+	metadata["fit_mode"] = fit_mode
+	metadata["maintain_aspect_ratio"] = _maintain_aspect_ratio_for_fit_mode(fit_mode)
 	return metadata
 
 func _apply_loaded_texture_to_slot(slot_name: String) -> void:
@@ -281,7 +312,7 @@ func _apply_loaded_texture_to_slot(slot_name: String) -> void:
 	var surface: TextureRect = slot_info.get("surface", null)
 	if surface == null or not is_instance_valid(surface):
 		return
-	var fit_mode := str(slot_info.get("fit_mode", _fit_mode_for_surface(bool(slot_info.get("maintain_aspect_ratio", true)))))
+	var fit_mode := str(slot_info.get("fit_mode", DEFAULT_FIT_MODE))
 	if _vendor_loader.has_method("apply_result_to_surface"):
 		_vendor_loader.call("apply_result_to_surface", surface, _loaded_texture, fit_mode)
 	else:
@@ -289,19 +320,26 @@ func _apply_loaded_texture_to_slot(slot_name: String) -> void:
 		surface.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		surface.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED if fit_mode == "cover" else TextureRect.STRETCH_SCALE
+		match fit_mode:
+			FIT_MODE_STRETCH:
+				surface.stretch_mode = TextureRect.STRETCH_SCALE
+			FIT_MODE_CONTAIN:
+				surface.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_:
+				surface.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 
 func _on_vendor_load_success(vendor_result: Dictionary, on_success: Callable) -> void:
 	var detail: Dictionary = vendor_result.get("detail", {})
 	_loaded_texture = detail.get("texture", null)
 	_loaded_image = detail.get("image", null)
-	var maintain_aspect_ratio := true
+	var fit_mode := DEFAULT_FIT_MODE
 	if detail.has("source"):
-		maintain_aspect_ratio = bool(detail.get("source", {}).get("metadata", {}).get("maintain_aspect_ratio", true))
+		fit_mode = _normalize_fit_mode(detail.get("source", {}).get("fit_mode", detail.get("source", {}).get("metadata", {}).get("fit_mode", DEFAULT_FIT_MODE)))
 	_loaded_source = {
 		"path": str(detail.get("source", {}).get("path", "")),
 		"slot": str(detail.get("source", {}).get("metadata", {}).get("slot", _active_slot)),
-		"maintain_aspect_ratio": maintain_aspect_ratio,
+		"fit_mode": fit_mode,
+		"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(fit_mode),
 		"metadata": detail.get("source", {}).get("metadata", {}).duplicate(true),
 		"path_kind": detail.get("path_kind", ""),
 	}
@@ -312,7 +350,8 @@ func _on_vendor_load_success(vendor_result: Dictionary, on_success: Callable) ->
 	_last_result = _ok({
 		"path": _loaded_source.get("path", ""),
 		"slot": _active_slot,
-		"maintain_aspect_ratio": maintain_aspect_ratio,
+		"fit_mode": fit_mode,
+		"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(fit_mode),
 		"texture": _loaded_texture,
 		"image": _loaded_image,
 		"width": int(detail.get("width", 0)),
@@ -332,7 +371,7 @@ func _on_vendor_load_failure(vendor_error: Dictionary, on_failure: Callable) -> 
 	var detail: Dictionary = vendor_error.get("detail", {})
 	var source_detail: Dictionary = detail.get("source", {})
 	var metadata: Dictionary = source_detail.get("metadata", {})
-	var maintain_aspect_ratio := bool(metadata.get("maintain_aspect_ratio", true))
+	var fit_mode := _normalize_fit_mode(metadata.get("fit_mode", source_detail.get("fit_mode", DEFAULT_FIT_MODE)))
 	var slot_name := _normalize_slot_name(str(metadata.get("slot", _active_slot)))
 	_loaded_texture = null
 	_loaded_image = null
@@ -345,14 +384,16 @@ func _on_vendor_load_failure(vendor_error: Dictionary, on_failure: Callable) -> 
 		"detail": {
 			"path": str(source_detail.get("path", detail.get("path", ""))),
 			"slot": slot_name,
-			"maintain_aspect_ratio": maintain_aspect_ratio,
+			"fit_mode": fit_mode,
+			"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(fit_mode),
 			"backend_error": vendor_error.duplicate(true),
 		},
 	}
 	_emit_state_changed(_compose_state_detail({
 		"path": str(source_detail.get("path", detail.get("path", ""))),
 		"slot": slot_name,
-		"maintain_aspect_ratio": maintain_aspect_ratio,
+		"fit_mode": fit_mode,
+		"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(fit_mode),
 	}))
 	image_failed.emit(_last_error.duplicate(true))
 	if on_failure.is_valid():
@@ -364,6 +405,7 @@ func _compose_state_detail(overrides: Dictionary = {}) -> Dictionary:
 	if _loaded_image != null:
 		width = _loaded_image.get_width()
 		height = _loaded_image.get_height()
+	var fit_mode := str(_loaded_source.get("fit_mode", DEFAULT_FIT_MODE))
 	var detail := {
 		"backend": DEFAULT_VENDOR_BACKEND_ID,
 		"backend_ready": _vendor_loader != null,
@@ -371,7 +413,8 @@ func _compose_state_detail(overrides: Dictionary = {}) -> Dictionary:
 		"slot_names": PackedStringArray(_slot_surfaces.keys()),
 		"surface_attached": bool(get_slot_descriptor(_active_slot).get("attached", false)),
 		"path": str(_loaded_source.get("path", "")),
-		"maintain_aspect_ratio": bool(_loaded_source.get("maintain_aspect_ratio", true)),
+		"fit_mode": fit_mode,
+		"maintain_aspect_ratio": _maintain_aspect_ratio_for_fit_mode(fit_mode),
 		"width": width,
 		"height": height,
 	}
