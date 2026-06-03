@@ -17,6 +17,7 @@ config/features=PackedStringArray("4.6", "Forward Plus")
 [autoload]
 
 AeroImageLoader="*res://addons/aerobeat-tool-image-loader/src/AeroImageLoader.gd"
+AeroHeadlessManager="*res://addons/aerobeat-tool-headless-manager/src/AeroHeadlessManager.gd"
 
 [editor_plugins]
 
